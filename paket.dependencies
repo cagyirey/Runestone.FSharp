@@ -1,0 +1,19 @@
+group Main
+	framework: net45
+    source https://www.nuget.org/api/v2
+
+	nuget FSharp.Core
+	
+group Build
+	framework: net45
+    source https://www.nuget.org/api/v2
+
+    nuget FAKE
+
+group Tests
+	framework: net45
+    source https://www.nuget.org/api/v2
+
+	nuget FsUnit
+	nuget NUnit.Console
+	github fsprojects/FsUnit src/FsUnit.NUnit/FsUnit.fs

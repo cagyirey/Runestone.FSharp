@@ -1,0 +1,36 @@
+RESTRICTION: == net45
+NUGET
+  remote: https://www.nuget.org/api/v2
+    FSharp.Core (4.2.2)
+
+GROUP Build
+RESTRICTION: == net45
+NUGET
+  remote: https://www.nuget.org/api/v2
+    FAKE (4.63)
+
+GROUP Tests
+RESTRICTION: == net45
+NUGET
+  remote: https://www.nuget.org/api/v2
+    FSharp.Core (4.2.2)
+    FsUnit (3.0)
+      FSharp.Core (>= 3.1.2.5)
+      NUnit (>= 3.6)
+    NUnit (3.7.1)
+    NUnit.Console (3.7)
+      NUnit.ConsoleRunner (>= 3.7)
+      NUnit.Extension.NUnitProjectLoader (>= 3.5)
+      NUnit.Extension.NUnitV2Driver (>= 3.6)
+      NUnit.Extension.NUnitV2ResultWriter (>= 3.5)
+      NUnit.Extension.TeamCityEventListener (>= 1.0.2)
+      NUnit.Extension.VSProjectLoader (>= 3.5)
+    NUnit.ConsoleRunner (3.7)
+    NUnit.Extension.NUnitProjectLoader (3.6)
+    NUnit.Extension.NUnitV2Driver (3.6)
+    NUnit.Extension.NUnitV2ResultWriter (3.5)
+    NUnit.Extension.TeamCityEventListener (1.0.2)
+    NUnit.Extension.VSProjectLoader (3.5)
+GITHUB
+  remote: fsprojects/FsUnit
+    src/FsUnit.NUnit/FsUnit.fs (d8da7f1a51f2d1804179259bf61c7af4c49dff2c)
