@@ -64,10 +64,7 @@ type OptionalHeader = {
 
 }
     with
-        member x.Is64Bit =
-            match x.BaseOfData with
-            | Some _ -> false
-            | None -> true
+        member x.Is64Bit = x.BaseOfData.IsNone
 
         static member internal FromNative32(header: IMAGE_OPTIONAL_HEADER32) = {
             LinkerVersion = Version(int header.MajorLinkerVersion, int header.MinorLinkerVersion)

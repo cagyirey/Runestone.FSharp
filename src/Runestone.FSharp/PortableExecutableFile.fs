@@ -7,7 +7,7 @@ open System.Reflection
 
 open Runestone.FSharp.NativeInteropHelper
 
-type PortableExecutableFile private (mmap: MemoryMappedFile) as this =
+type PortableExecutableFile private (mmap: MemoryMappedFile) =
 
     let dosHeader, fileHeader, optionalHeader, sectionHeaders = 
         using (mmap.CreateViewAccessor()) (fun reader ->
@@ -38,7 +38,7 @@ type PortableExecutableFile private (mmap: MemoryMappedFile) as this =
             )
     
     new(path: string) =
-        // This ctor should theoretically stop "file is in use by another process" errors
+        // BUG: "file is in use by another process" - should be solved with read only permissions but FileAccess.Read causes UnauthorizedAccessException
         PortableExecutableFile(MemoryMappedFile.CreateFromFile path)
 
     new(buffer: byte[]) =
@@ -58,6 +58,9 @@ type PortableExecutableFile private (mmap: MemoryMappedFile) as this =
     member x.OptionalHeader = optionalHeader
 
     member x.SectionHeaders = sectionHeaders
+
+    member x.ResolveImports () =
+        
 
     interface IDisposable with
         override x.Dispose () =
