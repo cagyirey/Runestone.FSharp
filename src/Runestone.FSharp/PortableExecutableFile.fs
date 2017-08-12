@@ -34,6 +34,7 @@ type PortableExecutableFile private (mmap: MemoryMappedFile) =
                     |> Array.map (SectionHeader.FromNative)
                     |> Array.toList
 
+
                 dosHeader, fileHeader, optionalHeader, sectionHeaders
             )
     
@@ -59,7 +60,8 @@ type PortableExecutableFile private (mmap: MemoryMappedFile) =
 
     member x.SectionHeaders = sectionHeaders
 
-    member x.ResolveImports () =
+    member internal x.ResolveExports (optionalHeader: OptionalHeader) =
+        using(mmap.CreateViewAccessor(optionalHeader.ex))
         
 
     interface IDisposable with
