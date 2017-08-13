@@ -34,6 +34,16 @@ type DllCharacteristics =
     | ControlFlowGuard = 0x4000
     | TerminalServerAware = 0x8000
 
+type DataDirectory = {
+    VirtualAddress: UInt32
+    Size: UInt32
+}
+    with
+        static member internal FromNative(header: IMAGE_DATA_DIRECTORY) = {
+            VirtualAddress = header.VirtualAddress
+            Size = header.Size
+        }         
+
 type OptionalHeader = {
     LinkerVersion: Version
     OperatingSystemVersion: Version
@@ -61,6 +71,22 @@ type OptionalHeader = {
     SizeOfheapCommit: uint64
     LoaderFlags: uint32
     NumberOfRvaAndSizes: uint32
+
+    ExportTable: DataDirectory
+    ImportTable: DataDirectory
+    ResourceTable: DataDirectory
+    ExceptionTable: DataDirectory
+    CertificateTable: DataDirectory
+    BaseRelocationTable: DataDirectory
+    Debug: DataDirectory
+    Architecture: DataDirectory
+    GlobalPtr: DataDirectory
+    TlsTable: DataDirectory
+    LoadConfigTable: DataDirectory
+    BoundImport: DataDirectory
+    ImportAddressTable: DataDirectory
+    DelayImportDescriptor: DataDirectory
+    ClrRuntimeHeader: DataDirectory
 
 }
     with
@@ -93,6 +119,22 @@ type OptionalHeader = {
             SizeOfheapCommit = uint64 header.SizeOfHeapReserve
             LoaderFlags = header.LoaderFlags
             NumberOfRvaAndSizes = header.NumberOfRvaAndSizes
+
+            ExportTable = DataDirectory.FromNative header.ExportTable
+            ImportTable = DataDirectory.FromNative header.ImportTable
+            ResourceTable = DataDirectory.FromNative header.ResourceTable
+            ExceptionTable = DataDirectory.FromNative header.ExceptionTable
+            CertificateTable = DataDirectory.FromNative header.CertificateTable
+            BaseRelocationTable = DataDirectory.FromNative header.BaseRelocationTable
+            Debug = DataDirectory.FromNative header.Debug
+            Architecture = DataDirectory.FromNative header.Architecture
+            GlobalPtr = DataDirectory.FromNative header.GlobalPtr
+            TlsTable = DataDirectory.FromNative header.TLSTable
+            LoadConfigTable = DataDirectory.FromNative header.LoadConfigTable
+            BoundImport = DataDirectory.FromNative header.BoundImport
+            ImportAddressTable = DataDirectory.FromNative header.IAT
+            DelayImportDescriptor = DataDirectory.FromNative header.DelayImportDescriptor
+            ClrRuntimeHeader = DataDirectory.FromNative header.CLRRuntimeHeader
         }
 
         static member internal FromNative64(header: IMAGE_OPTIONAL_HEADER64) = {
@@ -122,5 +164,21 @@ type OptionalHeader = {
             SizeOfheapCommit = header.SizeOfHeapReserve
             LoaderFlags = header.LoaderFlags
             NumberOfRvaAndSizes = header.NumberOfRvaAndSizes
+
+            ExportTable = DataDirectory.FromNative header.ExportTable
+            ImportTable = DataDirectory.FromNative header.ImportTable
+            ResourceTable = DataDirectory.FromNative header.ResourceTable
+            ExceptionTable = DataDirectory.FromNative header.ExceptionTable
+            CertificateTable = DataDirectory.FromNative header.CertificateTable
+            BaseRelocationTable = DataDirectory.FromNative header.BaseRelocationTable
+            Debug = DataDirectory.FromNative header.Debug
+            Architecture = DataDirectory.FromNative header.Architecture
+            GlobalPtr = DataDirectory.FromNative header.GlobalPtr
+            TlsTable = DataDirectory.FromNative header.TLSTable
+            LoadConfigTable = DataDirectory.FromNative header.LoadConfigTable
+            BoundImport = DataDirectory.FromNative header.BoundImport
+            ImportAddressTable = DataDirectory.FromNative header.IAT
+            DelayImportDescriptor = DataDirectory.FromNative header.DelayImportDescriptor
+            ClrRuntimeHeader = DataDirectory.FromNative header.CLRRuntimeHeader
         }
             
