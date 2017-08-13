@@ -5,7 +5,7 @@ using System.Text;
 namespace Runestone.FSharp.NativeInteropHelper
 {
     [StructLayout(LayoutKind.Sequential)]
-    public unsafe struct IMAGE_SECTION_HEADER
+    internal unsafe struct IMAGE_SECTION_HEADER
     {
         public fixed byte Name[8];
         public UInt32 VirtualSize;

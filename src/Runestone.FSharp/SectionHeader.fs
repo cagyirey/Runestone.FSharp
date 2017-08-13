@@ -12,7 +12,7 @@ type SectionHeader = {
     PointerToLineNumbers: uint32
     NumberOfRelocations: uint16
     NumberOfLineNumbers: uint16
-    Characteristics: uint32
+    Characteristics: uint32 // TOOD: Implement section flags
 }
     with
         static member internal FromNative(header: IMAGE_SECTION_HEADER) = {

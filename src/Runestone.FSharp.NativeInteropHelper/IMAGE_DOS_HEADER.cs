@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 namespace Runestone.FSharp.NativeInteropHelper
 {
     [StructLayout(LayoutKind.Sequential)]
-    public unsafe struct IMAGE_DOS_HEADER {      
+    internal unsafe struct IMAGE_DOS_HEADER {      
         public fixed byte e_magic[2];       // Magic number
         public UInt16 e_cblp;               // Bytes on last page of file
         public UInt16 e_cp;                 // Pages in file

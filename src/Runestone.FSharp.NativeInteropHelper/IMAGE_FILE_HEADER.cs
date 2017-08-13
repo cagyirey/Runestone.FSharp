@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 namespace Runestone.FSharp.NativeInteropHelper
 {
     [StructLayout(LayoutKind.Sequential)]
-    public unsafe struct IMAGE_FILE_HEADER {
+    internal unsafe struct IMAGE_FILE_HEADER {
         public fixed byte Signature[4];
 
         public UInt16 Machine;

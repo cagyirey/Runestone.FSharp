@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 namespace Runestone.FSharp.NativeInteropHelper
 {
     [StructLayout(LayoutKind.Sequential)]
-    public unsafe struct IMAGE_OPTIONAL_HEADER32 {
+    internal unsafe struct IMAGE_OPTIONAL_HEADER32 {
         public fixed byte Magic[2];
         public Byte MajorLinkerVersion;
         public Byte MinorLinkerVersion;

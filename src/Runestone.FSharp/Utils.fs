@@ -1,6 +1,9 @@
 ﻿namespace Runestone.FSharp.PortableExecutable
 
 open System.IO.MemoryMappedFiles
+open System.Runtime.InteropServices
+
+open Microsoft.FSharp.NativeInterop
 
 open Runestone.FSharp.NativeInteropHelper
 
@@ -14,7 +17,7 @@ module internal Utilities =
         if int size = pe32Size then PE32
         elif int size = pe64Size then PE64
         else invalidArg "fileHeader" "Could not determine the optional header type from its size"
-
+        
     type MemoryMappedViewAccessor with
 
         member x.Read<'T>(position: int64) =
@@ -26,3 +29,10 @@ module internal Utilities =
             let structures : 'T [] = Array.zeroCreate count
             x.ReadArray(position, structures, 0, count) |> ignore
             structures
+
+    type SafeBuffer with
+        member x.AcquirePointer () =
+            let ptr = ref (NativePtr.ofNativeInt 0n)
+            x.AcquirePointer ptr
+            !ptr
+            

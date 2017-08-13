@@ -8,16 +8,16 @@ namespace Runestone.FSharp.NativeInteropHelper
 {
     internal struct IMAGE_EXPORT_DIRECTORY
     {
-        internal UInt32 m_Characteristics;
-        internal UInt32 m_TimeDateStamp;
-        internal UInt16 m_MajorVersion;
-        internal UInt16 m_MinorVersion;
-        internal UInt32 m_AddressOfModuleName;
-        internal UInt32 m_OrdinalBase;
-        internal UInt32 m_NumberOfFunctions;
-        internal UInt32 m_NumberOfNames;
-        internal UInt32 m_AddressOfFunctions;     // RVA from base of image
-        internal UInt32 m_AddressOfNames;         // RVA from base of image
-        internal UInt32 m_AddressOfNameOrdinals;  // RVA from base of image
+        public UInt32 Characteristics;
+        public UInt32 TimeDateStamp;
+        public UInt16 MajorVersion;
+        public UInt16 MinorVersion;
+        public UInt32 AddressOfModuleName;
+        public UInt32 OrdinalBase;
+        public UInt32 NumberOfFunctions;
+        public UInt32 NumberOfNames;
+        public UInt32 AddressOfFunctions;
+        public UInt32 AddressOfNames;
+        public UInt32 AddressOfNameOrdinals;
     }
 }
