@@ -58,9 +58,10 @@
     <Compile Include="OptionalHeader.fs" />
     <Compile Include="SectionHeader.fs" />
     <Compile Include="ExportDirectory.fs" />
+    <Compile Include="ImportDirectory.fs" />
+    <Compile Include="typeConv.fs" />
     <Compile Include="PortableExecutableFile.fs" />
     <None Include="paket.references" />
-    <None Include="Script1.fsx" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <Choose>

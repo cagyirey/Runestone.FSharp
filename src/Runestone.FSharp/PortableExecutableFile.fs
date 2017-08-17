@@ -5,8 +5,9 @@ open System.IO
 open System.IO.MemoryMappedFiles
 open System.Reflection
 
-open Runestone.FSharp.NativeInteropHelper
 open Microsoft.FSharp.NativeInterop
+
+open Runestone.FSharp.NativeInteropHelper
 
 [<AutoOpen>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -24,7 +25,7 @@ module PortableExecutableFile =
        let section = findSection file virtualAddress
        int64 (virtualAddress - section.VirtualAddress + section.PointerToRawData)
 
-type PortableExecutableFile private (mmap: MemoryMappedFile) as this =
+type PortableExecutableFile private (mmap: MemoryMappedFile, access : MemoryMappedFileAccess) as this =
     
     let getFileOffset = getFileOffset this
     let findSection = findSection this
@@ -34,41 +35,42 @@ type PortableExecutableFile private (mmap: MemoryMappedFile) as this =
         |> NativePtr.ofNativeInt<'T>
     
     let dosHeader, fileHeader, optionalHeader, sectionHeaders = 
-        using (mmap.CreateViewAccessor()) (fun reader ->
-            let dosHeader = DosHeader.FromNative (reader.Read 0L)
+        using (mmap.CreateViewAccessor(0L, 0L, access)) (fun reader ->
+            let dosHeader = mkDosHeader (reader.Read 0L)
 
             let ntHeaderOffset = int64 dosHeader.NtHeaderOffset
             let optHeaderOffset = ntHeaderOffset + int64 sizeof<IMAGE_FILE_HEADER>
 
-            let fileHeader = FileHeader.FromNative (reader.Read ntHeaderOffset)
+            let fileHeader = mkFileHeader (reader.Read ntHeaderOffset)
             let sectionHeaderOffset = optHeaderOffset + int64 fileHeader.SizeOfOptionalHeader
 
             let optionalHeader = 
                 match fileHeader.SizeOfOptionalHeader with
-                | PE32 -> OptionalHeader.FromNative32 (reader.Read optHeaderOffset)
-                | PE64 -> OptionalHeader.FromNative64 (reader.Read optHeaderOffset)
+                | PE32 -> mkOptionalHeader32 (reader.Read optHeaderOffset)
+                | PE64 -> mkOptionalHeader64 (reader.Read optHeaderOffset)
                 
             let sectionHeaders = 
                 reader.ReadArray(sectionHeaderOffset, int fileHeader.NumberOfSections)
-                |> Array.map (SectionHeader.FromNative)
+                |> Array.map mkSectionHeader
                 |> Array.toList
 
             dosHeader, fileHeader, optionalHeader, sectionHeaders
         )
             
     new(path: string) =
-        // BUG: "file is in use by another process" - should be solved with read only permissions but FileAccess.Read causes UnauthorizedAccessException
-        PortableExecutableFile(MemoryMappedFile.CreateFromFile path)
-
+        let fileStream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
+        let mmf = MemoryMappedFile.CreateFromFile(fileStream, null, 0L, MemoryMappedFileAccess.Read, null, HandleInheritability.None, false)
+        PortableExecutableFile(mmf, MemoryMappedFileAccess.Read)
+        
     new(buffer: byte[]) =
-        let mem = MemoryMappedFile.CreateNew(null, buffer.LongLength)
-        using(mem.CreateViewStream()) (fun memStream -> memStream.Write(buffer, 0, buffer.Length))
-        PortableExecutableFile mem
+        let mmf = MemoryMappedFile.CreateNew(null, buffer.LongLength)
+        using(mmf.CreateViewStream()) (fun memStream -> memStream.Write(buffer, 0, buffer.Length))
+        PortableExecutableFile(mmf, MemoryMappedFileAccess.ReadWrite)
 
     new(stream: #Stream) =
-        let mem = MemoryMappedFile.CreateNew(null, int64 stream.Length)
-        using(mem.CreateViewStream()) (fun memStream -> stream.CopyTo memStream)
-        PortableExecutableFile mem
+        let mmf = MemoryMappedFile.CreateNew(null, int64 stream.Length)
+        using(mmf.CreateViewStream()) (fun memStream -> stream.CopyTo memStream)
+        PortableExecutableFile(mmf, MemoryMappedFileAccess.ReadWrite)
 
     member x.DosHeader = dosHeader
 
@@ -78,8 +80,16 @@ type PortableExecutableFile private (mmap: MemoryMappedFile) as this =
 
     member x.SectionHeaders = sectionHeaders
 
+    member x.OpenSection(name: string) =
+        let section = List.find (fun (section : SectionHeader) -> section.Name = name) sectionHeaders
+        mmap.CreateViewStream(int64 section.PointerToRawData, int64 section.SizeOfRawData, access) :> UnmanagedMemoryStream
+
+    member x.OpenSection(section: SectionHeader) =
+        let section = List.find ((=) section) sectionHeaders
+        mmap.CreateViewStream(int64 section.PointerToRawData, int64 section.SizeOfRawData, access) :> UnmanagedMemoryStream
+
     member x.ResolveExports () =
-        use accessor = mmap.CreateViewAccessor()
+        use accessor = mmap.CreateViewAccessor(0L, 0L, access)
         let exportTable : IMAGE_EXPORT_DIRECTORY = accessor.Read (getFileOffset x.OptionalHeader.ExportTable.VirtualAddress)
 
         let pImageData = accessor.SafeMemoryMappedViewHandle.AcquirePointer ()
@@ -103,12 +113,34 @@ type PortableExecutableFile private (mmap: MemoryMappedFile) as this =
 
         { 
             ModuleName = moduleName
-            Timestamp = DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(float exportTable.TimeDateStamp)
+            Timestamp = DateTime.FromUnixTimeSeconds(int64 exportTable.TimeDateStamp)
             Version = Version(int exportTable.MajorVersion, int exportTable.MinorVersion)
             OrdinalBase = exportTable.OrdinalBase
             ExportedFunctions = exports
         }
 
+    member x.ResolveImports () =
+        use accessor = mmap.CreateViewAccessor(0L, 0L, access)
+        
+        let importDirectoryTableOffset = getFileOffset x.OptionalHeader.ImportTable.VirtualAddress
+        let importDirectoryTable : IMAGE_IMPORT_DIRECTORY [] = Seq.toArray (accessor.ReadMany importDirectoryTableOffset)
+
+        Array.map (fun (importDirectory : IMAGE_IMPORT_DIRECTORY) ->
+            let importLookups : Choice<uint32 [], uint64 []> = 
+                let offset = getFileOffset importDirectory.ImportLookupTableAddress
+                if x.OptionalHeader.Is64Bit then
+                    Choice2Of2 (accessor.ReadMany offset)
+                else 
+                    Choice1Of2 (accessor.ReadMany offset)
+
+            {
+                ModuleName = accessor.ReadString (getFileOffset importDirectory.AddressOfModuleName)
+                Timestamp = DateTime.FromUnixTimeSeconds (int64 importDirectory.TimeDateStamp)
+                ImportTableAddress = importDirectory.ImportAddressTable
+                ImportLookups = importLookups
+            }
+        ) importDirectoryTable
+       
     interface IDisposable with
         override x.Dispose () =
             mmap.Dispose()

@@ -1,6 +1,21 @@
 ﻿namespace Runestone.FSharp.PortableExecutable
 
+open System
 open Runestone.FSharp.NativeInteropHelper
+
+[<Flags>]
+type SectionFlags =
+| NoPadding =           0x8
+| Code =                0x20
+| InitializedData =     0x40
+| UninitializedData =   0x1000000
+| GlobalPtrRelative =   0x2000000
+| ExtendedRelocations = 0x4000000
+| NotCached =           0x8000000
+| SharedMemory =        0x10000000
+| Execute =             0x20000000
+| Read =                0x40000000
+| Write =               0x80000000
 
 type SectionHeader = {
     Name: string
@@ -12,18 +27,5 @@ type SectionHeader = {
     PointerToLineNumbers: uint32
     NumberOfRelocations: uint16
     NumberOfLineNumbers: uint16
-    Characteristics: uint32 // TOOD: Implement section flags
+    Characteristics: SectionFlags
 }
-    with
-        static member internal FromNative(header: IMAGE_SECTION_HEADER) = {
-            Name = header.ManagedName
-            VirtualSize = header.VirtualSize
-            VirtualAddress = header.VirtualAddress
-            SizeOfRawData = header.SizeOfRawData
-            PointerToRawData = header.PointerToRawData
-            PointerToRelocations = header.PointerToRelocations
-            PointerToLineNumbers = header.PointerToLinenumbers
-            NumberOfLineNumbers = header.NumberOfLinenumbers
-            NumberOfRelocations = header.NumberOfRelocations
-            Characteristics = header.Characteristics
-    }

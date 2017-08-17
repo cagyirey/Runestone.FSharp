@@ -59,14 +59,3 @@ type FileHeader = {
     SizeOfOptionalHeader: uint16
     Characteristics: FileCharacteristics
 }
-    with
-        static member internal FromNative(header: IMAGE_FILE_HEADER) = {
-            Signature = header.ManagedSignature
-            Machine = LanguagePrimitives.EnumOfValue header.Machine
-            NumberOfSections = header.NumberOfSections
-            DatetimeStamp = DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(float header.TimeDateStamp)
-            PointerToSymbolTable = header.PointerToSymbolTable
-            NumberOfSymbols = header.NumberOfSymbols
-            SizeOfOptionalHeader = header.SizeOfOptionalHeader
-            Characteristics = LanguagePrimitives.EnumOfValue header.Characteristics
-        }

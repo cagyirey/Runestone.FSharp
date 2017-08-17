@@ -40,7 +40,9 @@ let testAssemblies = "bin/**/*Tests*.dll"
 let isAppveyorBuild = (environVar >> isNotNullOrEmpty) "APPVEYOR" 
 let appveyorBuildVersion = sprintf "%s-a%s" releaseNotes.AssemblyVersion (DateTime.UtcNow.ToString "yyMMddHHmm")
 
-let mergeBinaries = false
+// merge settings
+let mergeTargets = ["Runestone.FSharp.NativeInteropHelper.dll"]
+let mergeBinaries = true
 
 Target "Clean" (fun () ->
     CleanDirs [buildDir]
@@ -81,22 +83,16 @@ Target "Build" (fun _ ->
 
 Target "ILMerge" (fun _ -> 
     let ilmergePath = "./packages/build/ilmerge/tools/ilmerge.exe"
-    let targetBinary = solutionName + ".dll"
-    let mergedLibs = 
-        Directory.GetFiles(outputDir, "*.dll")
-        |> Set.ofArray
-        |> Set.remove (outputDir @@ targetBinary)
 
-    let mergeFolder = Directory.CreateDirectory (buildDir @@ "merged")
     ILMerge 
         (fun p -> 
             { p with 
                 ToolPath = ilmergePath
-                Libraries = mergedLibs
-                AllowDuplicateTypes = AllowDuplicateTypes.AllPublicTypes
+                Libraries = List.map (fun target -> outputDir @@ target) mergeTargets
+                AllowDuplicateTypes = AllowDuplicateTypes.NoDuplicateTypes
         })
-        (mergeFolder.FullName @@ targetBinary)
-        (Path.GetFullPath <| outputDir @@ targetBinary)
+        (outputDir @@ solutionName + "_merged.dll")
+        (outputDir @@ solutionName + ".dll")
 )
 
 Target "RunTests" (fun _ ->
@@ -116,7 +112,7 @@ Target "All" DoNothing
     ==> "AssemblyInfo"
     ==> "CopyLicense"
     ==> "Build"
-    =?>("ILMerge", mergeBinaries)
+    =?>("ILMerge", configuration = "Release")
     //==> "RunTests"
     ==> "All"
 

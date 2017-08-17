@@ -21,22 +21,3 @@ type DosHeader = {
     OemInfo: uint16
     NtHeaderOffset: uint32
 }
-    with
-        static member internal FromNative(header: IMAGE_DOS_HEADER) = {
-            MagicBytes = header.ManagedSignature
-            BytesOnLastPage = header.e_cblp
-            PageCount = header.e_cp
-            RelocationCount = header.e_crlc
-            MinimumParagraphs = header.e_minalloc
-            MaximumParagraphs = header.e_maxalloc
-            InitialSsValue = header.e_ss
-            InitialSpValue = header.e_sp
-            InitialIpValue = header.e_ip
-            InitialCsValue = header.e_cs
-            Checksum = header.e_csum
-            RelocationsOffset = header.e_lfarlc
-            Overlay = header.e_ovno
-            OemId = header.e_oemid
-            OemInfo = header.e_oeminfo
-            NtHeaderOffset = header.e_lfanew
-    }

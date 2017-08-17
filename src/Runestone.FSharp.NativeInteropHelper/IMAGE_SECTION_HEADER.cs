@@ -16,7 +16,7 @@ namespace Runestone.FSharp.NativeInteropHelper
         public UInt32 PointerToLinenumbers;
         public UInt16 NumberOfRelocations;
         public UInt16 NumberOfLinenumbers;
-        public UInt32 Characteristics;
+        public Int32 Characteristics;
 
         public string ManagedName { 
             get

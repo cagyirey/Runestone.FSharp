@@ -8,6 +8,7 @@ RESTRICTION: == net45
 NUGET
   remote: https://www.nuget.org/api/v2
     FAKE (4.63)
+    ilmerge (2.14.1208)
 
 GROUP Tests
 RESTRICTION: == net45
@@ -27,10 +28,10 @@ NUGET
       NUnit.Extension.VSProjectLoader (>= 3.5)
     NUnit.ConsoleRunner (3.7)
     NUnit.Extension.NUnitProjectLoader (3.6)
-    NUnit.Extension.NUnitV2Driver (3.6)
-    NUnit.Extension.NUnitV2ResultWriter (3.5)
+    NUnit.Extension.NUnitV2Driver (3.7)
+    NUnit.Extension.NUnitV2ResultWriter (3.6)
     NUnit.Extension.TeamCityEventListener (1.0.2)
-    NUnit.Extension.VSProjectLoader (3.5)
+    NUnit.Extension.VSProjectLoader (3.6)
 GITHUB
   remote: fsprojects/FsUnit
-    src/FsUnit.NUnit/FsUnit.fs (d8da7f1a51f2d1804179259bf61c7af4c49dff2c)
+    src/FsUnit.NUnit/FsUnit.fs (ccd7f01fe792b149731261c816b851bf4e8e5e43)
