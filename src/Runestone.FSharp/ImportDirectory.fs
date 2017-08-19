@@ -2,9 +2,18 @@
 
 open System
 
+type ImportHint = {
+    Hint: uint16
+    Name: string
+}
+
+type ImportedFunction =
+    | ImportByOrdinal of uint16
+    | NamedImport of ImportHint
+
 type ImportDirectory = {
     ModuleName: string
     Timestamp: DateTime
     ImportTableAddress: uint32
-    ImportLookups: Choice<uint32 [], uint64 []>
+    ImportedFunctions: ImportedFunction []
 }

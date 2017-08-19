@@ -11,3 +11,7 @@
 * Moved native type conversions to an internal module
 * Implemented section flags
 * Added ILMerge to the build workflow
+
+### 0.0.4 - August 19 2017
+* Changed `ImportDirectory.Imports : Choice<uint32 [], uint64 []>` to `ImportDirectory.ImportedFunctions : ImportedFunction []`
+* Changed `ResolveExports` to `TryResolveExports`

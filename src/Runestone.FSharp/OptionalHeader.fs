@@ -87,7 +87,4 @@ type OptionalHeader = {
     with
         member x.Is64Bit = x.BaseOfData.IsNone
 
-        
-
-
             

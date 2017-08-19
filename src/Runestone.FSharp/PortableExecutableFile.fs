@@ -88,58 +88,73 @@ type PortableExecutableFile private (mmap: MemoryMappedFile, access : MemoryMapp
         let section = List.find ((=) section) sectionHeaders
         mmap.CreateViewStream(int64 section.PointerToRawData, int64 section.SizeOfRawData, access) :> UnmanagedMemoryStream
 
-    member x.ResolveExports () =
-        use accessor = mmap.CreateViewAccessor(0L, 0L, access)
-        let exportTable : IMAGE_EXPORT_DIRECTORY = accessor.Read (getFileOffset x.OptionalHeader.ExportTable.VirtualAddress)
-
-        let pImageData = accessor.SafeMemoryMappedViewHandle.AcquirePointer ()
-        let moduleName = String(addVirtualOffset<_, sbyte> pImageData exportTable.AddressOfModuleName)
-            
-        let exportRvas : uint32 [] = accessor.ReadArray(getFileOffset exportTable.AddressOfFunctions, int exportTable.NumberOfFunctions)
-        let nameRvas : uint32 [] = accessor.ReadArray(getFileOffset exportTable.AddressOfNames, int exportTable.NumberOfNames)
-        let ordinals : uint16 [] = accessor.ReadArray(getFileOffset exportTable.AddressOfNameOrdinals, int exportTable.NumberOfNames)
-
-        let names = Array.map(fun rva -> String(addVirtualOffset<_, sbyte> pImageData rva)) nameRvas
-        let nameOrdinalPairs = Array.zip ordinals names |> Map
+    member x.TryResolveExports () =
         
-        let exports = 
-            Array.mapi(fun i functionRva ->
-                {
-                    Name = Map.tryFind (uint16 i) nameOrdinalPairs 
-                    VirtualAddress = functionRva
-                    Ordinal = uint16 exportTable.OrdinalBase + uint16 i
-                }
-            ) exportRvas
+        if x.OptionalHeader.ExportTable.VirtualAddress <> 0u then
+            use accessor = mmap.CreateViewAccessor(0L, 0L, access)
+            let exportTable : IMAGE_EXPORT_DIRECTORY = accessor.Read (getFileOffset x.OptionalHeader.ExportTable.VirtualAddress)
 
-        { 
-            ModuleName = moduleName
-            Timestamp = DateTime.FromUnixTimeSeconds(int64 exportTable.TimeDateStamp)
-            Version = Version(int exportTable.MajorVersion, int exportTable.MinorVersion)
-            OrdinalBase = exportTable.OrdinalBase
-            ExportedFunctions = exports
-        }
+            let pImageData = accessor.SafeMemoryMappedViewHandle.AcquirePointer ()
+            let moduleName = String(addVirtualOffset<_, sbyte> pImageData exportTable.AddressOfModuleName)
+            
+            let exportRvas : uint32 [] = accessor.ReadArray(getFileOffset exportTable.AddressOfFunctions, int exportTable.NumberOfFunctions)
+            let nameRvas : uint32 [] = accessor.ReadArray(getFileOffset exportTable.AddressOfNames, int exportTable.NumberOfNames)
+            let ordinals : uint16 [] = accessor.ReadArray(getFileOffset exportTable.AddressOfNameOrdinals, int exportTable.NumberOfNames)
+
+            let names = Array.map(fun rva -> String(addVirtualOffset<_, sbyte> pImageData rva)) nameRvas
+            let nameOrdinalPairs = Array.zip ordinals names |> Map
+        
+            let exports = 
+                Array.mapi(fun i functionRva ->
+                    {
+                        Name = Map.tryFind (uint16 i) nameOrdinalPairs 
+                        VirtualAddress = functionRva
+                        Ordinal = uint16 exportTable.OrdinalBase + uint16 i
+                    }
+                ) exportRvas
+
+            Some { 
+                ModuleName = moduleName
+                Timestamp = DateTime.FromUnixTimeSeconds(int64 exportTable.TimeDateStamp)
+                Version = Version(int exportTable.MajorVersion, int exportTable.MinorVersion)
+                OrdinalBase = exportTable.OrdinalBase
+                ExportedFunctions = exports
+            }
+        else None
 
     member x.ResolveImports () =
-        use accessor = mmap.CreateViewAccessor(0L, 0L, access)
+        if x.OptionalHeader.ImportTable.VirtualAddress <> 0u then
+            use accessor = mmap.CreateViewAccessor(0L, 0L, access)
         
-        let importDirectoryTableOffset = getFileOffset x.OptionalHeader.ImportTable.VirtualAddress
-        let importDirectoryTable : IMAGE_IMPORT_DIRECTORY [] = Seq.toArray (accessor.ReadMany importDirectoryTableOffset)
+            let importDirectoryTableOffset = getFileOffset x.OptionalHeader.ImportTable.VirtualAddress
+            let importDirectoryTable : IMAGE_IMPORT_DIRECTORY [] = Seq.toArray (accessor.ReadMany importDirectoryTableOffset)
 
-        Array.map (fun (importDirectory : IMAGE_IMPORT_DIRECTORY) ->
-            let importLookups : Choice<uint32 [], uint64 []> = 
-                let offset = getFileOffset importDirectory.ImportLookupTableAddress
-                if x.OptionalHeader.Is64Bit then
-                    Choice2Of2 (accessor.ReadMany offset)
-                else 
-                    Choice1Of2 (accessor.ReadMany offset)
+            Array.map (fun (importDirectory : IMAGE_IMPORT_DIRECTORY) ->
+                let importLookups = 
+                    let offset = getFileOffset importDirectory.ImportLookupTableAddress
+                    if x.OptionalHeader.Is64Bit then
+                        Array.map mkImportLookup64 (accessor.ReadMany offset)
+                    else 
+                        Array.map mkImportLookup32 (accessor.ReadMany offset)
 
-            {
-                ModuleName = accessor.ReadString (getFileOffset importDirectory.AddressOfModuleName)
-                Timestamp = DateTime.FromUnixTimeSeconds (int64 importDirectory.TimeDateStamp)
-                ImportTableAddress = importDirectory.ImportAddressTable
-                ImportLookups = importLookups
-            }
-        ) importDirectoryTable
+                let imports = Array.map(fun import -> 
+                    match import with
+                    | Choice1Of2 nameRva -> 
+                        let offset = getFileOffset nameRva
+                        NamedImport {
+                            Hint = accessor.ReadUInt16 offset
+                            Name = accessor.ReadString(offset + 2L)
+                        }
+                    | Choice2Of2 ordinal -> ImportByOrdinal ordinal) importLookups
+
+                {
+                    ModuleName = accessor.ReadString (getFileOffset importDirectory.AddressOfModuleName)
+                    Timestamp = DateTime.FromUnixTimeSeconds (int64 importDirectory.TimeDateStamp)
+                    ImportTableAddress = importDirectory.ImportAddressTable
+                    ImportedFunctions = imports
+                }
+            ) importDirectoryTable
+        else Array.empty
        
     interface IDisposable with
         override x.Dispose () =

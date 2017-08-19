@@ -53,6 +53,16 @@ module internal TypeConversions =
         VirtualAddress = header.VirtualAddress
         Size = header.Size
     }
+    
+    let mkImportLookup64 (lookup: uint64) =
+        let importByName = (lookup &&& 0x8000000000000000UL) = 0UL
+        if importByName then Choice1Of2 (uint32 lookup)
+        else Choice2Of2 (uint16 lookup)
+
+    let mkImportLookup32 (lookup: uint32) =
+        let importByName = (lookup &&& 0x80000000u) = 0u
+        if importByName then Choice1Of2 lookup
+        else Choice2Of2 (uint16 lookup)
 
     let mkOptionalHeader32 (header: IMAGE_OPTIONAL_HEADER32) = {
         LinkerVersion = Version(int header.MajorLinkerVersion, int header.MinorLinkerVersion)
