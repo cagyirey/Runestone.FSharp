@@ -1,5 +1,5 @@
 group Main
-	framework: net45
+	framework: auto-detect
     source https://www.nuget.org/api/v2
 
 	nuget FSharp.Core

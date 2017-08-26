@@ -3,12 +3,16 @@
 #nowarn "9"
 
 open System
+open System.Diagnostics
 open System.IO.MemoryMappedFiles
 open System.Runtime.InteropServices
 
 open Microsoft.FSharp.NativeInterop
 
+open Runestone.FSharp
 open Runestone.FSharp.NativeInteropHelper
+
+open Kernel32
 
 [<AutoOpen>]
 module internal Utilities =
@@ -23,6 +27,11 @@ module internal Utilities =
 
     type DateTime with
         static member FromUnixTimeSeconds(seconds: int64) = DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(float seconds)
+
+    type Process with
+        // TODO: make this less brittle
+        member x.OpenHandle() = 
+            Kernel32.OpenProcess(ProcessRights.VirtualMemoryRead, x.Id)
 
     type SafeBuffer with
         member x.AcquirePointer () =
@@ -54,5 +63,10 @@ module internal Utilities =
                 else Some(structure, offset + int64 sizeof<'T>)) position
             |> Seq.toArray
 
-
-            
+        member x.CopyFromProcessMemory(proc: System.Diagnostics.Process) offset length =
+            let handle = proc.OpenHandle()
+            try 
+                Kernel32.ReadProcessMemory(handle.DangerousGetHandle(), offset, x.SafeMemoryMappedViewHandle.AcquirePointer(), length)
+            finally
+                handle.Close()
+            |> ignore

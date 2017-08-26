@@ -15,3 +15,8 @@
 ### 0.0.4 - August 19 2017
 * Changed `ImportDirectory.Imports : Choice<uint32 [], uint64 []>` to `ImportDirectory.ImportedFunctions : ImportedFunction []`
 * Changed `ResolveExports` to `TryResolveExports`
+
+### 0.0.5 - August 26 2017
+* Added P/Invoke infrastructure for reading process memory
+* Added `PortableExecutableFile` constructors for working with in-memory modules
+* Changed the .NET framework version to 4.7 (requires minimum 4.6)

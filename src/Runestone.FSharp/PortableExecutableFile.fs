@@ -1,13 +1,17 @@
 ﻿namespace rec Runestone.FSharp.PortableExecutable
 
+#nowarn "9"
+
 open System
+open System.Diagnostics
 open System.IO
 open System.IO.MemoryMappedFiles
-open System.Reflection
 
 open Microsoft.FSharp.NativeInterop
 
+open Runestone.FSharp
 open Runestone.FSharp.NativeInteropHelper
+open Microsoft.Win32.SafeHandles
 
 [<AutoOpen>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -25,13 +29,12 @@ module PortableExecutableFile =
        let section = findSection file virtualAddress
        int64 (virtualAddress - section.VirtualAddress + section.PointerToRawData)
 
-type PortableExecutableFile private (mmap: MemoryMappedFile, access : MemoryMappedFileAccess) as this =
-    
-    let getFileOffset = getFileOffset this
-    let findSection = findSection this
+type PortableExecutableFile private (mmap: MemoryMappedFile, access: MemoryMappedFileAccess, isVirtualMemory: bool) as this =
+   
+    let getOffset = if isVirtualMemory then int64 else getFileOffset this
 
     let addVirtualOffset (ptr: nativeptr<_>) offset =
-        (NativePtr.toNativeInt ptr) + nativeint (getFileOffset offset)
+        (NativePtr.toNativeInt ptr) + nativeint (getOffset offset)
         |> NativePtr.ofNativeInt<'T>
     
     let dosHeader, fileHeader, optionalHeader, sectionHeaders = 
@@ -60,18 +63,31 @@ type PortableExecutableFile private (mmap: MemoryMappedFile, access : MemoryMapp
     new(path: string) =
         let fileStream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
         let mmf = MemoryMappedFile.CreateFromFile(fileStream, null, 0L, MemoryMappedFileAccess.Read, null, HandleInheritability.None, false)
-        PortableExecutableFile(mmf, MemoryMappedFileAccess.Read)
+        new PortableExecutableFile(mmf, MemoryMappedFileAccess.Read, false)
         
     new(buffer: byte[]) =
         let mmf = MemoryMappedFile.CreateNew(null, buffer.LongLength)
         using(mmf.CreateViewStream()) (fun memStream -> memStream.Write(buffer, 0, buffer.Length))
-        PortableExecutableFile(mmf, MemoryMappedFileAccess.ReadWrite)
+        new PortableExecutableFile(mmf, MemoryMappedFileAccess.ReadWrite, false)
 
     new(stream: #Stream) =
         let mmf = MemoryMappedFile.CreateNew(null, int64 stream.Length)
         using(mmf.CreateViewStream()) (fun memStream -> stream.CopyTo memStream)
-        PortableExecutableFile(mmf, MemoryMappedFileAccess.ReadWrite)
+        new PortableExecutableFile(mmf, MemoryMappedFileAccess.ReadWrite, false)
 
+    private new(proc: Process, md: ProcessModule) =
+        let mmf = MemoryMappedFile.CreateNew(null, int64 md.ModuleMemorySize)
+        using(mmf.CreateViewAccessor()) (fun accessor -> accessor.CopyFromProcessMemory proc md.BaseAddress (nativeint md.ModuleMemorySize))
+        new PortableExecutableFile(mmf, MemoryMappedFileAccess.ReadWrite, true)
+
+    new(proc: Process, moduleName: string) =
+        let md = 
+            seq { for md in proc.Modules do yield md }
+            |> Seq.find(fun md -> md.ModuleName = moduleName)
+        new PortableExecutableFile(proc, md)
+
+    new(proc: Process) = new PortableExecutableFile(proc, proc.MainModule.ModuleName)
+        
     member x.DosHeader = dosHeader
 
     member x.FileHeader = fileHeader
@@ -89,17 +105,16 @@ type PortableExecutableFile private (mmap: MemoryMappedFile, access : MemoryMapp
         mmap.CreateViewStream(int64 section.PointerToRawData, int64 section.SizeOfRawData, access) :> UnmanagedMemoryStream
 
     member x.TryResolveExports () =
-        
         if x.OptionalHeader.ExportTable.VirtualAddress <> 0u then
             use accessor = mmap.CreateViewAccessor(0L, 0L, access)
-            let exportTable : IMAGE_EXPORT_DIRECTORY = accessor.Read (getFileOffset x.OptionalHeader.ExportTable.VirtualAddress)
+            let exportTable : IMAGE_EXPORT_DIRECTORY = accessor.Read (getOffset x.OptionalHeader.ExportTable.VirtualAddress)
 
             let pImageData = accessor.SafeMemoryMappedViewHandle.AcquirePointer ()
             let moduleName = String(addVirtualOffset<_, sbyte> pImageData exportTable.AddressOfModuleName)
             
-            let exportRvas : uint32 [] = accessor.ReadArray(getFileOffset exportTable.AddressOfFunctions, int exportTable.NumberOfFunctions)
-            let nameRvas : uint32 [] = accessor.ReadArray(getFileOffset exportTable.AddressOfNames, int exportTable.NumberOfNames)
-            let ordinals : uint16 [] = accessor.ReadArray(getFileOffset exportTable.AddressOfNameOrdinals, int exportTable.NumberOfNames)
+            let exportRvas : uint32 [] = accessor.ReadArray(getOffset exportTable.AddressOfFunctions, int exportTable.NumberOfFunctions)
+            let nameRvas : uint32 [] = accessor.ReadArray(getOffset exportTable.AddressOfNames, int exportTable.NumberOfNames)
+            let ordinals : uint16 [] = accessor.ReadArray(getOffset exportTable.AddressOfNameOrdinals, int exportTable.NumberOfNames)
 
             let names = Array.map(fun rva -> String(addVirtualOffset<_, sbyte> pImageData rva)) nameRvas
             let nameOrdinalPairs = Array.zip ordinals names |> Map
@@ -126,12 +141,12 @@ type PortableExecutableFile private (mmap: MemoryMappedFile, access : MemoryMapp
         if x.OptionalHeader.ImportTable.VirtualAddress <> 0u then
             use accessor = mmap.CreateViewAccessor(0L, 0L, access)
         
-            let importDirectoryTableOffset = getFileOffset x.OptionalHeader.ImportTable.VirtualAddress
+            let importDirectoryTableOffset = getOffset x.OptionalHeader.ImportTable.VirtualAddress
             let importDirectoryTable : IMAGE_IMPORT_DIRECTORY [] = Seq.toArray (accessor.ReadMany importDirectoryTableOffset)
 
             Array.map (fun (importDirectory : IMAGE_IMPORT_DIRECTORY) ->
                 let importLookups = 
-                    let offset = getFileOffset importDirectory.ImportLookupTableAddress
+                    let offset = getOffset importDirectory.ImportLookupTableAddress
                     if x.OptionalHeader.Is64Bit then
                         Array.map mkImportLookup64 (accessor.ReadMany offset)
                     else 
@@ -140,7 +155,7 @@ type PortableExecutableFile private (mmap: MemoryMappedFile, access : MemoryMapp
                 let imports = Array.map(fun import -> 
                     match import with
                     | Choice1Of2 nameRva -> 
-                        let offset = getFileOffset nameRva
+                        let offset = getOffset nameRva
                         NamedImport {
                             Hint = accessor.ReadUInt16 offset
                             Name = accessor.ReadString(offset + 2L)
@@ -148,7 +163,7 @@ type PortableExecutableFile private (mmap: MemoryMappedFile, access : MemoryMapp
                     | Choice2Of2 ordinal -> ImportByOrdinal ordinal) importLookups
 
                 {
-                    ModuleName = accessor.ReadString (getFileOffset importDirectory.AddressOfModuleName)
+                    ModuleName = accessor.ReadString (getOffset importDirectory.AddressOfModuleName)
                     Timestamp = DateTime.FromUnixTimeSeconds (int64 importDirectory.TimeDateStamp)
                     ImportTableAddress = importDirectory.ImportAddressTable
                     ImportedFunctions = imports
